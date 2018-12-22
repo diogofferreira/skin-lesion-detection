@@ -28,12 +28,12 @@ def plot_training(history):
   plt.show()
 
 
-def create_set_folder(set_dir, normal, melanoma, seborrheic):
+def create_set_folder(set_dir, nevus, melanoma, seborrheic):
     os.mkdir(set_dir)
     
-    os.mkdir(set_dir + '/normal')
-    for f in normal:
-        shutil.copy(f, set_dir + '/normal')
+    os.mkdir(set_dir + '/nevus')
+    for f in nevus:
+        shutil.copy(f, set_dir + '/nevus')
     
     os.mkdir(set_dir + '/melanoma')
     for f in melanoma:
@@ -44,21 +44,21 @@ def create_set_folder(set_dir, normal, melanoma, seborrheic):
         shutil.copy(f, set_dir + '/seborrheic')
 
 
-normal = glob('dataset/normal/*.jpg')
+nevus = glob('dataset/nevus/*.jpg')
 melanoma = glob('dataset/melanoma/*.jpg')
 seborrheic = glob('dataset/seborrheic/*.jpg')
 
-normal_train, normal_test = train_test_split(normal, test_size=0.30)
+nevus_train, nevus_test = train_test_split(nevus, test_size=0.30)
 melanoma_train, melanoma_test = train_test_split(melanoma, test_size=0.30)
 seborrheic_train, seborrheic_test = train_test_split(seborrheic, test_size=0.30)
 
-create_set_folder('train', normal_train, melanoma_train, seborrheic_train)
-create_set_folder('test', normal_test, melanoma_test, seborrheic_test)
+create_set_folder('train', nevus_train, melanoma_train, seborrheic_train)
+create_set_folder('test', nevus_test, melanoma_test, seborrheic_test)
 
 
 # Plot some samples of each class
 
-n = np.random.choice(normal_train, 5)
+n = np.random.choice(nevus_train, 5)
 m = np.random.choice(melanoma_train, 5)
 s = np.random.choice(seborrheic_train, 5)
 
