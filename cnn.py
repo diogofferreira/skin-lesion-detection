@@ -1,10 +1,10 @@
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import os, shutil
 from glob import glob
 from keras import backend as K
-from keras.models import Model
-from keras.layers import Dense, Sequential, Conv2D, MaxPooling2D, Flatten
+from keras.models import Model, Sequential
+from keras.layers import Dense, Conv2D, MaxPooling2D, Flatten
 from keras.layers.core import Activation
 from keras.preprocessing.image import ImageDataGenerator
 from PIL import Image
@@ -45,6 +45,8 @@ def create_set_folder(set_dir, nevus, melanoma, seborrheic):
         shutil.copy(f, set_dir + '/seborrheic')
 
 
+print("Creating train and test datasets...")
+
 nevus = glob('dataset/nevus/*.jpg')
 melanoma = glob('dataset/melanoma/*.jpg')
 seborrheic = glob('dataset/seborrheic/*.jpg')
@@ -58,63 +60,78 @@ create_set_folder('test', nevus_test, melanoma_test, seborrheic_test)
 
 
 # Plot some samples of each class
+plotsamples = False
 
-n = np.random.choice(nevus_train, 5)
-m = np.random.choice(melanoma_train, 5)
-s = np.random.choice(seborrheic_train, 5)
+if plotsamples:
+    n = np.random.choice(nevus_train, 5)
+    m = np.random.choice(melanoma_train, 5)
+    s = np.random.choice(seborrheic_train, 5)
 
-data = np.concatenate((n, m, s))
-labels = 5 * ['Normal'] + 5 * ['Melanoma'] + 5 * ['Seborrheic']
+    data = np.concatenate((n, m, s))
+    labels = 5 * ['Normal'] + 5 * ['Melanoma'] + 5 * ['Seborrheic']
 
-N, R, C = 15, 3, 5
-plt.figure(figsize=(12, 9))
-for k, (src, label) in enumerate(zip(data, labels)):
-    im = Image.open(src).convert('RGB')
-    plt.subplot(R, C, k + 1)
-    plt.title(label)
-    plt.imshow(np.asarray(im))
-    plt.axis('off')
-plt.show()
+    N, R, C = 15, 3, 5
+    plt.figure(figsize=(12, 9))
+    for k, (src, label) in enumerate(zip(data, labels)):
+        im = Image.open(src).convert('RGB')
+        plt.subplot(R, C, k + 1)
+        plt.title(label)
+        plt.imshow(np.asarray(im))
+        plt.axis('off')
+    plt.show()
+
 
 CLASSES = 3
 WIDTH = 299
 HEIGHT = 299
 BATCH_SIZE = 32
 
+print("Building model...")
 
 # Setup model
 K.set_image_data_format('channels_last')
 model = Sequential()
 
-# Layer 1
-model.add(Conv2D(40, kernel_size=5, padding="same", input_shape=(WIDTH, HEIGTH, 3), activation='relu'))
-model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+## SINGLELAYER ##
 
-# Layer 2
-model.add(Conv2D(70, kernel_size=3, padding="same", activation = 'relu'))
-model.add(Conv2D(500, kernel_size=3, padding="same", activation = 'relu'))
+model.add(Conv2D(40, kernel_size=5, padding="same", input_shape=(WIDTH, HEIGHT, 3), activation='relu'))
 model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-model.add(Conv2D(1024, kernel_size=3, padding="valid", activation = 'relu'))
-model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-# Layer 3 - Flatten layer
 model.add(Flatten())
 model.add(Dense(units=100, activation='relu'))
-model.add(Dropout(0.1))
-model.add(Dense(units=100, activation='relu'))
-model.add(Dropout(0.1))
-model.add(Dense(units=100, activation='relu'))
-model.add(Dropout(0.3))
-
-model.add(Dense(CLASSES))
-model.add(Activation("softmax"))
+model.add(Dense(units=CLASSES, activation='softmax'))
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+## MULTILAYER ##
+
+# Layer 1
+#model.add(Conv2D(40, kernel_size=5, padding="same", input_shape=(WIDTH, HEIGTH, 3), activation='relu'))
+#model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+# Layer 2
+#model.add(Conv2D(70, kernel_size=3, padding="same", activation = 'relu'))
+#model.add(Conv2D(500, kernel_size=3, padding="same", activation = 'relu'))
+#model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+#model.add(Conv2D(1024, kernel_size=3, padding="valid", activation = 'relu'))
+#model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+# Layer 3 - Flatten layer
+#model.add(Flatten())
+#model.add(Dense(units=100, activation='relu'))
+#model.add(Dropout(0.1))
+#model.add(Dense(units=100, activation='relu'))
+#model.add(Dropout(0.1))
+#model.add(Dense(units=100, activation='relu'))
+#model.add(Dropout(0.3))
+
+#model.add(Dense(CLASSES))
+#model.add(Activation("softmax"))
+#model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 
 # data prep
 train_datagen = ImageDataGenerator(
-    preprocessing_function=preprocess_input,
+    #preprocessing_function=preprocess_input,
     rotation_range=40,
     width_shift_range=0.2,
     height_shift_range=0.2,
@@ -124,7 +141,7 @@ train_datagen = ImageDataGenerator(
     fill_mode='nearest')
 
 validation_datagen = ImageDataGenerator(
-    preprocessing_function=preprocess_input,
+    #preprocessing_function=preprocess_input,
     rotation_range=40,
     width_shift_range=0.2,
     height_shift_range=0.2,
@@ -151,6 +168,8 @@ STEPS_PER_EPOCH = 320
 VALIDATION_STEPS = 64
 
 MODEL_FILE = 'filename.model'
+
+print("Training model...")
 
 history = model.fit_generator(
     train_generator,

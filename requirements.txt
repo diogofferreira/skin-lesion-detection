@@ -1,6 +1,11 @@
+scipy
 numpy
 matplotlib
+pandas
+statsmodels
 sklearn
-Pillow
 keras
-tensorflow
+tensorflow==1.5.0
+deepspeech
+jupyter
+pillow
