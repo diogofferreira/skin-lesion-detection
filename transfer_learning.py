@@ -25,23 +25,27 @@ def plot_training(history):
   plt.plot(epochs, loss, 'r.')
   plt.plot(epochs, val_loss, 'r-')
   plt.title('Training and validation loss')
-  plt.show()
+  plt.savefig('history.png')
+  #plt.show()
 
 
 def create_set_folder(set_dir, nevus, melanoma, seborrheic):
     os.mkdir(set_dir)
     
-    os.mkdir(set_dir + '/nevus')
+    os.mkdir(set_dir + '/nevus_seborr')
     for f in nevus:
-        shutil.copy(f, set_dir + '/nevus')
+        shutil.copy(f, set_dir + '/nevus_seborr')
+    
+    for f in seborrheic:
+        shutil.copy(f, set_dir + '/nevus_seborr')
     
     os.mkdir(set_dir + '/melanoma')
     for f in melanoma:
         shutil.copy(f, set_dir + '/melanoma')
 
-    os.mkdir(set_dir + '/seborrheic')
-    for f in seborrheic:
-        shutil.copy(f, set_dir + '/seborrheic')
+    #os.mkdir(set_dir + '/seborrheic')
+    #for f in seborrheic:
+    #    shutil.copy(f, set_dir + '/seborrheic')
 
 
 nevus = glob('dataset/nevus/*.jpg')
@@ -56,6 +60,7 @@ create_set_folder('train', nevus_train, melanoma_train, seborrheic_train)
 create_set_folder('test', nevus_test, melanoma_test, seborrheic_test)
 
 
+"""
 # Plot some samples of each class
 
 n = np.random.choice(nevus_train, 5)
@@ -63,7 +68,7 @@ m = np.random.choice(melanoma_train, 5)
 s = np.random.choice(seborrheic_train, 5)
 
 data = np.concatenate((n, m, s))
-labels = 5 * ['Normal'] + 5 * ['Melanoma'] + 5 * ['Seborrheic']
+labels = 5 * ['Nevus'] + 5 * ['Melanoma'] + 5 * ['Seborrheic']
 
 N, R, C = 15, 3, 5
 plt.figure(figsize=(12, 9))
@@ -74,8 +79,9 @@ for k, (src, label) in enumerate(zip(data, labels)):
     plt.imshow(np.asarray(im))
     plt.axis('off')
 plt.show()
+"""
 
-CLASSES = 3
+CLASSES = 2
 
 # Setup model
 base_model = InceptionV3(weights='imagenet', include_top=False)
@@ -94,36 +100,38 @@ model.compile(optimizer='rmsprop',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
-WIDTH = 299
-HEIGHT = 299
+WIDTH = 256
+HEIGHT = 256
 BATCH_SIZE = 32
 
 # data prep
 train_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_input,
     rotation_range=40,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
+    #width_shift_range=0.2,
+    #height_shift_range=0.2,
+    #shear_range=0.2,
+    #zoom_range=0.2,
     horizontal_flip=True,
+    vertical_flip=True,
     fill_mode='nearest')
 
 validation_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_input,
     rotation_range=40,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
+    #width_shift_range=0.2,
+    #height_shift_range=0.2,
+    #shear_range=0.2,
+    #zoom_range=0.2,
     horizontal_flip=True,
+    vertical_flip=True,
     fill_mode='nearest')
 
 train_generator = train_datagen.flow_from_directory(
     'train',
     target_size=(HEIGHT, WIDTH),
-		batch_size=BATCH_SIZE,
-		class_mode='categorical')
+    batch_size=BATCH_SIZE,
+    class_mode='categorical')
     
 validation_generator = validation_datagen.flow_from_directory(
     'test',
@@ -131,7 +139,7 @@ validation_generator = validation_datagen.flow_from_directory(
     batch_size=BATCH_SIZE,
     class_mode='categorical')
 
-EPOCHS = 5
+EPOCHS = 15
 BATCH_SIZE = 32
 STEPS_PER_EPOCH = 320
 VALIDATION_STEPS = 64
@@ -149,7 +157,6 @@ model.save(MODEL_FILE)
 
 plot_training(history)
 
-
 # remove test and train paths
-shutil.rmtree('/train') 
-shutil.rmtree('/test') 
+shutil.rmtree('train') 
+shutil.rmtree('test') 
