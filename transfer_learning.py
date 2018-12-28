@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os, shutil
 from glob import glob
+from keras import optimizers
 from keras.models import Model
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.applications.inception_v3 import InceptionV3, preprocess_input
