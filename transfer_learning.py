@@ -95,9 +95,10 @@ model = Model(inputs=base_model.input, outputs=predictions)
 # transfer learning
 for layer in base_model.layers:
     layer.trainable = False
-      
-model.compile(optimizer='rmsprop',
-              loss='categorical_crossentropy',
+
+sgd = optimizers.SGD(nesterov=True)
+model.compile(optimizer=sgd,
+              loss='binary_crossentropy',
               metrics=['accuracy'])
 
 WIDTH = 256
