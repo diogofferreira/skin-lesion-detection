@@ -92,14 +92,24 @@ inception_base_model = InceptionV3(weights='imagenet', include_top=False)
 vgg_base_model = VGG19(weights='imagenet', include_top=False)
 resnet_base_model = ResNet50(weights='imagenet', include_top=False)
 
-x = base_model.output
+x = inception_base_model.output
 x = GlobalAveragePooling2D(name='avg_pool')(x)
 x = Dropout(0.4)(x)
-predictions = Dense(CLASSES, activation='softmax')(x)
+predictions_inception = Dense(CLASSES, activation='softmax')(x)
 
-inception_model = Model(inputs=inception_base_model.input, outputs=predictions)
-vgg_model = Model(inputs=vgg_base_model.input, outputs=predictions)
-resnet_model = Model(inputs=resnet_base_model.input, outputs=predictions)
+x = vgg_base_model.output
+x = GlobalAveragePooling2D(name='avg_pool')(x)
+x = Dropout(0.4)(x)
+predictions_vgg = Dense(CLASSES, activation='softmax')(x)
+
+x = resnet_base_model.output
+x = GlobalAveragePooling2D(name='avg_pool')(x)
+x = Dropout(0.4)(x)
+predictions_resnet = Dense(CLASSES, activation='softmax')(x)
+
+inception_model = Model(inputs=inception_base_model.input, outputs=predictions_inception)
+vgg_model = Model(inputs=vgg_base_model.input, outputs=predictions_vgg)
+resnet_model = Model(inputs=resnet_base_model.input, outputs=predictions_resnet)
    
 # transfer learning
 for layer in inception_base_model.layers:
