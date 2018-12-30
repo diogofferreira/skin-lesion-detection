@@ -6,28 +6,31 @@ from keras import optimizers
 from keras.models import Model
 from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from keras.applications.inception_v3 import InceptionV3, preprocess_input
+from keras.applications.vgg19 import VGG19
+from keras.applications.resnet50 import ResNet50
 from keras.preprocessing.image import ImageDataGenerator
 from PIL import Image
 from sklearn.model_selection import train_test_split
 
 
 def plot_training(history):
-  acc = history.history['acc']
-  val_acc = history.history['val_acc']
-  loss = history.history['loss']
-  val_loss = history.history['val_loss']
-  epochs = range(len(acc))
-  
-  plt.plot(epochs, acc, 'r.')
-  plt.plot(epochs, val_acc, 'r')
-  plt.title('Training and validation accuracy')
-  
-  plt.figure()
-  plt.plot(epochs, loss, 'r.')
-  plt.plot(epochs, val_loss, 'r-')
-  plt.title('Training and validation loss')
-  plt.savefig('history.png')
-  #plt.show()
+    acc = history.history['acc']
+    val_acc = history.history['val_acc']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    epochs = range(len(acc))
+
+    plt.plot(epochs, acc, 'r.')
+    plt.plot(epochs, val_acc, 'r')
+    plt.title('Training and validation accuracy')
+    plt.figure()
+    plt.savefig('history_acc.png')
+    
+    plt.plot(epochs, loss, 'r.')
+    plt.plot(epochs, val_loss, 'r-')
+    plt.title('Training and validation loss')
+    plt.savefig('history_loss.png')
+    #plt.show()
 
 
 def create_set_folder(set_dir, nevus, melanoma, seborrheic):
@@ -85,35 +88,48 @@ plt.show()
 CLASSES = 2
 
 # Setup model
-base_model = InceptionV3(weights='imagenet', include_top=False)
+inception_base_model = InceptionV3(weights='imagenet', include_top=False)
+vgg_base_model = VGG19(weights='imagenet', include_top=False)
+resnet_base_model = ResNet50(weights='imagenet', include_top=False)
 
 x = base_model.output
 x = GlobalAveragePooling2D(name='avg_pool')(x)
 x = Dropout(0.4)(x)
 predictions = Dense(CLASSES, activation='softmax')(x)
-model = Model(inputs=base_model.input, outputs=predictions)
+
+inception_model = Model(inputs=inception_base_model.input, outputs=predictions)
+vgg_model = Model(inputs=vgg_base_model.input, outputs=predictions)
+resnet_model = Model(inputs=resnet_base_model.input, outputs=predictions)
    
 # transfer learning
-for layer in base_model.layers:
+for layer in inception_base_model.layers:
     layer.trainable = False
 
-sgd = optimizers.SGD(nesterov=True)
-model.compile(optimizer=sgd,
-              loss='binary_crossentropy',
-              metrics=['accuracy'])
+for layer in vgg_base_model.layers:
+    layer.trainable = False
 
-WIDTH = 256
-HEIGHT = 256
+for layer in resnet_base_model.layers:
+    layer.trainable = False
+
+# Optimizer
+sgd = optimizers.SGD(nesterov=True)
+
+inception_model.compile(optimizer=sgd, loss='binary_crossentropy', metrics=['accuracy'])
+vgg_model.compile(optimizer=sgd, loss='binary_crossentropy', metrics=['accuracy'])
+resnet_model.compile(optimizer=sgd, loss='binary_crossentropy', metrics=['accuracy'])
+
+WIDTH = 224
+HEIGHT = 224
 BATCH_SIZE = 32
 
 # data prep
 train_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_input,
     rotation_range=40,
-    #width_shift_range=0.2,
-    #height_shift_range=0.2,
-    #shear_range=0.2,
-    #zoom_range=0.2,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
     horizontal_flip=True,
     vertical_flip=True,
     fill_mode='nearest')
@@ -121,13 +137,25 @@ train_datagen = ImageDataGenerator(
 validation_datagen = ImageDataGenerator(
     preprocessing_function=preprocess_input,
     rotation_range=40,
-    #width_shift_range=0.2,
-    #height_shift_range=0.2,
-    #shear_range=0.2,
-    #zoom_range=0.2,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
     horizontal_flip=True,
     vertical_flip=True,
     fill_mode='nearest')
+
+train_generator_inception = train_datagen.flow_from_directory(
+    'train',
+    target_size=(299, 299),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical')
+    
+validation_generator_inception = validation_datagen.flow_from_directory(
+    'test',
+    target_size=(299, 299),
+    batch_size=BATCH_SIZE,
+    class_mode='categorical')
 
 train_generator = train_datagen.flow_from_directory(
     'train',
@@ -141,21 +169,44 @@ validation_generator = validation_datagen.flow_from_directory(
     batch_size=BATCH_SIZE,
     class_mode='categorical')
 
-EPOCHS = 15
+EPOCHS = 5
 BATCH_SIZE = 32
 STEPS_PER_EPOCH = 320
 VALIDATION_STEPS = 64
 
-MODEL_FILE = 'filename.model'
+# Inception training
+history = inception_model.fit_generator(
+    train_generator_inception,
+    epochs=EPOCHS,
+    steps_per_epoch=STEPS_PER_EPOCH,
+    validation_data=validation_generator_inception,
+    validation_steps=VALIDATION_STEPS)
+  
+inception_model.save('inception.model')
 
-history = model.fit_generator(
+plot_training(history)
+
+# VGG training
+history = vgg_model.fit_generator(
     train_generator,
     epochs=EPOCHS,
     steps_per_epoch=STEPS_PER_EPOCH,
     validation_data=validation_generator,
     validation_steps=VALIDATION_STEPS)
   
-model.save(MODEL_FILE)
+vgg_model.save('vgg.model')
+
+plot_training(history)
+
+# ResNet training
+history = resnet_model.fit_generator(
+    train_generator,
+    epochs=EPOCHS,
+    steps_per_epoch=STEPS_PER_EPOCH,
+    validation_data=validation_generator,
+    validation_steps=VALIDATION_STEPS)
+  
+inception_model.save('resnet.model')
 
 plot_training(history)
 
