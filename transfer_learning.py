@@ -12,6 +12,39 @@ from keras.preprocessing.image import ImageDataGenerator
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
+from keras import backend as K
+
+def f1(y_true, y_pred):
+    precision = precision(y_true, y_pred)
+    recall = recall(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall+K.epsilon()))
+
+
+def recall(y_true, y_pred):
+    """Recall metric.
+
+    Only computes a batch-wise average of recall.
+
+    Computes the recall, a metric for multi-label classification of
+    how many relevant items are selected.
+    """
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+    recall = true_positives / (possible_positives + K.epsilon())
+    return recall
+
+def precision(y_true, y_pred):
+    """Precision metric.
+
+    Only computes a batch-wise average of precision.
+
+    Computes the precision, a metric for multi-label classification of
+    how many selected items are relevant.
+    """
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+    precision = true_positives / (predicted_positives + K.epsilon())
+    return precision
 
 def plot_training(history, model_name, save=True):
     acc = history.history['acc']
@@ -79,7 +112,7 @@ def prepare_sets():
     melanoma_test, melanoma_cross_val = train_test_split(melanoma_test, test_size=0.50)
     seborrheic_test, seborrheic_cross_val = train_test_split(seborrheic_test, test_size=0.50)
     
-    
+    """ 
     # Equalize set lengths
     nevus_train, melanoma_train, seborrheic_train = equalize_set_lengths(nevus_train, 
             melanoma_train, seborrheic_train)
@@ -87,7 +120,8 @@ def prepare_sets():
             melanoma_cross_val, seborrheic_cross_val)
     nevus_test, melanoma_test, seborrheic_test = equalize_set_lengths(nevus_test, 
             melanoma_test, seborrheic_test)
-    
+    """
+
     # Create folders with each set
     create_set_folder('train', nevus_train, melanoma_train, seborrheic_train)
     create_set_folder('cross_val', nevus_cross_val, melanoma_cross_val, seborrheic_cross_val)
@@ -153,13 +187,15 @@ def prepare_models(CLASSES=3):
     return inception_model, vgg_model, resnet_model
 
 
-def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=32):
+def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=64):
     
     # Optimizer
-    sgd = optimizers.SGD(nesterov=True)
-    
+    #sgd = optimizers.SGD(nesterov=True)
+    adam = optimizers.Adam()
+
     # Compile model
-    model.compile(optimizer=sgd, loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=adam, loss='categorical_crossentropy', 
+            metrics=['accuracy', precision, recall, f1])
     
     # data prep
     train_datagen = ImageDataGenerator(
@@ -189,19 +225,25 @@ def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=32):
     train_generator = train_datagen.flow_from_directory(
         'train',
         target_size=(HEIGHT, WIDTH),
+        shuffle=True,
         batch_size=BATCH_SIZE,
         class_mode='categorical')
-        
+    
     validation_generator = validation_datagen.flow_from_directory(
         'cross_val',
         target_size=(HEIGHT, WIDTH),
+        shuffle=True,
         batch_size=BATCH_SIZE,
         class_mode='categorical')
 
-    EPOCHS = 20
-    BATCH_SIZE = 32
-    STEPS_PER_EPOCH = train_generator.samples // BATCH_SIZE * 5
-    VALIDATION_STEPS = validation_generator.samples // BATCH_SIZE 
+    #EPOCHS = 20
+    #BATCH_SIZE = 32
+    #STEPS_PER_EPOCH = train_generator.samples // BATCH_SIZE * 5
+    #VALIDATION_STEPS = validation_generator.samples // BATCH_SIZE 
+
+    EPOCHS = 2
+    STEPS_PER_EPOCH = train_generator.samples
+    VALIDATION_STEPS = validation_generator.samples
 
     # Inception training
     history = model.fit_generator(
@@ -240,13 +282,14 @@ def binary_metrics(conf_matrix, change_class, max_class):
     return accuracy, precision, recall, f1score
 
 
-def evaluate_model(model, HEIGHT=224, WIDTH=224, BATCH_SIZE=32, to_binary=False):
+def evaluate_model(model, HEIGHT=224, WIDTH=224, BATCH_SIZE=64, to_binary=False):
     test_datagen = ImageDataGenerator(
             preprocessing_function=preprocess_input)
 
     test_generator = test_datagen.flow_from_directory(
         'test',
         target_size=(HEIGHT, WIDTH),
+        shuffle=True,
         batch_size=BATCH_SIZE,
         class_mode='categorical')
     
@@ -290,8 +333,8 @@ if __name__== "__main__":
     print('ResNet 2 classes')
     resnet = load_model('models/tl/2_classes/resnet.model')
     print(evaluate_model(resnet))
-    """ 
-    
+    """
+
     #print('Inception 3 classes')
     #inception = load_model('models/tl/3_classes/inception.model')
     #print(evaluate_model(inception, HEIGHT=299, WIDTH=299, to_binary=True))
@@ -308,4 +351,5 @@ if __name__== "__main__":
 
     # remove test and train paths
     shutil.rmtree('train') 
+    shutil.rmtree('cross_val') 
     shutil.rmtree('test') 
