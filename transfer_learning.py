@@ -69,15 +69,15 @@ def prepare_sets():
     melanoma = glob('dataset/melanoma/*.jpg')
     seborrheic = glob('dataset/seborrheic/*.jpg')
 
-    # Split test set from the others
-    nevus_train, nevus_test = train_test_split(nevus, test_size=0.20)
-    melanoma_train, melanoma_test = train_test_split(melanoma, test_size=0.20)
-    seborrheic_train, seborrheic_test = train_test_split(seborrheic, test_size=0.20)
+    # Split train set from the others
+    nevus_train, nevus_test = train_test_split(nevus, test_size=0.40)
+    melanoma_train, melanoma_test = train_test_split(melanoma, test_size=0.40)
+    seborrheic_train, seborrheic_test = train_test_split(seborrheic, test_size=0.40)
     
-    # Split train and cross validation set
-    nevus_train, nevus_cross_val = train_test_split(nevus, test_size=0.30)
-    melanoma_train, melanoma_cross_val = train_test_split(melanoma, test_size=0.30)
-    seborrheic_train, seborrheic_cross_val = train_test_split(seborrheic, test_size=0.30)
+    # Split test and cross validation set
+    nevus_test, nevus_cross_val = train_test_split(nevus_test, test_size=0.50)
+    melanoma_test, melanoma_cross_val = train_test_split(melanoma_test, test_size=0.50)
+    seborrheic_test, seborrheic_cross_val = train_test_split(seborrheic_test, test_size=0.50)
     
     
     # Equalize set lengths
@@ -164,25 +164,27 @@ def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=32):
     # data prep
     train_datagen = ImageDataGenerator(
         preprocessing_function=preprocess_input,
-        rotation_range=50,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.2,
-        zoom_range=0.2,
+        #rotation_range=50,
+        #width_shift_range=0.2,
+        #height_shift_range=0.2,
+        #shear_range=0.2,
+        #zoom_range=0.2,
         horizontal_flip=True,
         vertical_flip=True,
-        fill_mode='nearest')
+        fill_mode='nearest'
+    )
 
     validation_datagen = ImageDataGenerator(
-        preprocessing_function=preprocess_input,
-        rotation_range=50,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
-        vertical_flip=True,
-        fill_mode='nearest')
+        preprocessing_function=preprocess_input
+        #rotation_range=50,
+        #width_shift_range=0.2,
+        #height_shift_range=0.2,
+        #shear_range=0.2,
+        #zoom_range=0.2,
+        #horizontal_flip=True,
+        #vertical_flip=True,
+        #fill_mode='nearest'
+    )
 
     train_generator = train_datagen.flow_from_directory(
         'train',
@@ -196,10 +198,10 @@ def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=32):
         batch_size=BATCH_SIZE,
         class_mode='categorical')
 
-    EPOCHS = 5
+    EPOCHS = 20
     BATCH_SIZE = 32
-    STEPS_PER_EPOCH = 320
-    VALIDATION_STEPS = 64
+    STEPS_PER_EPOCH = train_generator.samples // BATCH_SIZE * 5
+    VALIDATION_STEPS = validation_generator.samples // BATCH_SIZE 
 
     # Inception training
     history = model.fit_generator(
@@ -239,7 +241,9 @@ def binary_metrics(conf_matrix, change_class, max_class):
 
 
 def evaluate_model(model, HEIGHT=224, WIDTH=224, BATCH_SIZE=32, to_binary=False):
-    test_datagen = ImageDataGenerator()
+    test_datagen = ImageDataGenerator(
+            preprocessing_function=preprocess_input)
+
     test_generator = test_datagen.flow_from_directory(
         'test',
         target_size=(HEIGHT, WIDTH),
@@ -270,7 +274,7 @@ if __name__== "__main__":
     
     inception, vgg, resnet = prepare_models()
     
-    inception = compile_and_train(inception, 'inception', WIDTH=299, HEIGTH=299)
+    #inception = compile_and_train(inception, 'inception', WIDTH=299, HEIGHT=299)
     vgg = compile_and_train(vgg, 'vgg')
     resnet = compile_and_train(resnet, 'resnet')
    
@@ -288,11 +292,11 @@ if __name__== "__main__":
     print(evaluate_model(resnet))
     """ 
     
-    print('Inception 3 classes')
+    #print('Inception 3 classes')
     #inception = load_model('models/tl/3_classes/inception.model')
-    print(evaluate_model(inception, HEIGHT=299, WIDTH=299, to_binary=True))
+    #print(evaluate_model(inception, HEIGHT=299, WIDTH=299, to_binary=True))
 
-    print('Inception 3 classes')
+    print('VGG 3 classes')
     #vgg = load_model('models/tl/3_classes/vgg.model')
     print(evaluate_model(vgg, to_binary=True))
     
