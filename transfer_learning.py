@@ -4,7 +4,7 @@ import os, shutil
 from glob import glob
 from keras import optimizers
 from keras.models import Model, load_model
-from keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from keras.layers import Input, Average, Dense, GlobalAveragePooling2D, Dropout
 from keras.applications.inception_v3 import InceptionV3, preprocess_input
 from keras.applications.vgg19 import VGG19
 from keras.applications.resnet50 import ResNet50
@@ -12,63 +12,50 @@ from keras.preprocessing.image import ImageDataGenerator
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
+from sklearn.utils import class_weight
 from keras import backend as K
 
-def f1(y_true, y_pred):
-    precision = precision(y_true, y_pred)
-    recall = recall(y_true, y_pred)
-    return 2*((precision*recall)/(precision+recall+K.epsilon()))
 
-
-def recall(y_true, y_pred):
-    """Recall metric.
-
-    Only computes a batch-wise average of recall.
-
-    Computes the recall, a metric for multi-label classification of
-    how many relevant items are selected.
-    """
+def recall_metric(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
     recall = true_positives / (possible_positives + K.epsilon())
     return recall
 
-def precision(y_true, y_pred):
-    """Precision metric.
 
-    Only computes a batch-wise average of precision.
-
-    Computes the precision, a metric for multi-label classification of
-    how many selected items are relevant.
-    """
+def precision_metric(y_true, y_pred):
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
     precision = true_positives / (predicted_positives + K.epsilon())
     return precision
 
-def plot_training(history, model_name, save=True):
+
+def f1_metric(y_true, y_pred):
+    precision = precision_metric(y_true, y_pred)
+    recall = recall_metric(y_true, y_pred)
+    return 2*((precision*recall)/(precision+recall+K.epsilon()))
+
+
+def save_plot(history, model_name):
     acc = history.history['acc']
     val_acc = history.history['val_acc']
     loss = history.history['loss']
     val_loss = history.history['val_loss']
     epochs = range(len(acc))
 
-    plt.plot(epochs, acc, 'r.')
-    plt.plot(epochs, val_acc, 'r')
-    plt.title('Training and validation accuracy')
     plt.figure()
+    plt.plot(epochs, acc)
+    plt.plot(epochs, val_acc)
+    plt.title('Training and validation accuracy')
+    plt.savefig(model_name + '_acc.png')
+    plt.close()
     
-    if save:
-        plt.savefig(model_name + '_acc.png')
-     
-    plt.plot(epochs, loss, 'r*')
-    plt.plot(epochs, val_loss, 'r-')
+    plf.figure()
+    plt.plot(epochs, loss)
+    plt.plot(epochs, val_loss)
     plt.title('Training and validation loss')
-    
-    if save:
-        plt.savefig(model_name + '_loss.png')
-    else:
-        plt.show()
+    plt.savefig(model_name + '_loss.png')
+    plt.close()
 
 
 def create_set_folder(set_dir, nevus, melanoma, seborrheic):
@@ -149,11 +136,14 @@ def plot_data():
     plt.show()
 
 
-def prepare_models(CLASSES=3):
+def prepare_models(CLASSES=2):
+
+    model_input = Input(shape=(224, 224, 3))
+
     # Setup model
-    inception_base_model = InceptionV3(weights='imagenet', include_top=False)
-    vgg_base_model = VGG19(weights='imagenet', include_top=False)
-    resnet_base_model = ResNet50(weights='imagenet', include_top=False)
+    inception_base_model = InceptionV3(weights='imagenet', include_top=False, input_tensor=model_input)
+    vgg_base_model = VGG19(weights='imagenet', include_top=False, input_tensor=model_input)
+    resnet_base_model = ResNet50(weights='imagenet', include_top=False, input_tensor=model_input)
 
     x = inception_base_model.output
     x = GlobalAveragePooling2D(name='avg_pool')(x)
@@ -190,81 +180,68 @@ def prepare_models(CLASSES=3):
 def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=64):
     
     # Optimizer
-    #sgd = optimizers.SGD(nesterov=True)
-    adam = optimizers.Adam()
+    sgd = optimizers.SGD(nesterov=True)
 
     # Compile model
-    model.compile(optimizer=adam, loss='categorical_crossentropy', 
-            metrics=['accuracy', precision, recall, f1])
+    model.compile(optimizer=sgd, loss='categorical_crossentropy', 
+            metrics=['accuracy', precision_metric, recall_metric, f1_metric])
     
     # data prep
     train_datagen = ImageDataGenerator(
         preprocessing_function=preprocess_input,
-        #rotation_range=50,
-        #width_shift_range=0.2,
-        #height_shift_range=0.2,
-        #shear_range=0.2,
-        #zoom_range=0.2,
+        rotation_range=50,
         horizontal_flip=True,
         vertical_flip=True,
         fill_mode='nearest'
     )
 
     validation_datagen = ImageDataGenerator(
-        preprocessing_function=preprocess_input
-        #rotation_range=50,
-        #width_shift_range=0.2,
-        #height_shift_range=0.2,
-        #shear_range=0.2,
-        #zoom_range=0.2,
-        #horizontal_flip=True,
-        #vertical_flip=True,
-        #fill_mode='nearest'
+            preprocessing_function=preprocess_input
     )
 
     train_generator = train_datagen.flow_from_directory(
-        'train',
+        'dataset/train',
         target_size=(HEIGHT, WIDTH),
         shuffle=True,
         batch_size=BATCH_SIZE,
         class_mode='categorical')
     
     validation_generator = validation_datagen.flow_from_directory(
-        'cross_val',
+        'dataset/cross_val',
         target_size=(HEIGHT, WIDTH),
         shuffle=True,
         batch_size=BATCH_SIZE,
         class_mode='categorical')
 
-    #EPOCHS = 20
-    #BATCH_SIZE = 32
-    #STEPS_PER_EPOCH = train_generator.samples // BATCH_SIZE * 5
-    #VALIDATION_STEPS = validation_generator.samples // BATCH_SIZE 
+    EPOCHS = 15
+    STEPS_PER_EPOCH = train_generator.samples // BATCH_SIZE * 3
+    VALIDATION_STEPS = validation_generator.samples // BATCH_SIZE 
+    
+    # Balance classes
+    class_weights = class_weight.compute_class_weight('balanced', 
+            np.unique(train_generator.classes), train_generator.classes)
 
-    EPOCHS = 2
-    STEPS_PER_EPOCH = train_generator.samples
-    VALIDATION_STEPS = validation_generator.samples
-
-    # Inception training
+    # Train model
     history = model.fit_generator(
         train_generator,
         epochs=EPOCHS,
+        class_weight=class_weights,
         steps_per_epoch=STEPS_PER_EPOCH,
         validation_data=validation_generator,
         validation_steps=VALIDATION_STEPS)
   
     model.save(model_name + '.model')
 
-    plot_training(history, model_name)
+    save_plot(history, model_name)
 
     return model
 
 
 def ensemble(models):
     outputs = [model.outputs[0] for model in models]
-    y = Average()(outputs)
+    output = Average()(outputs)
     
-    model = Model(model_input, y, name='ensemble')
+    model = Model(inputs=models[0].input, outputs=output, name='ensemble')
     
     return model
 
@@ -287,7 +264,7 @@ def evaluate_model(model, HEIGHT=224, WIDTH=224, BATCH_SIZE=64, to_binary=False)
             preprocessing_function=preprocess_input)
 
     test_generator = test_datagen.flow_from_directory(
-        'test',
+        'dataset/test',
         target_size=(HEIGHT, WIDTH),
         shuffle=True,
         batch_size=BATCH_SIZE,
@@ -313,25 +290,24 @@ def evaluate_model(model, HEIGHT=224, WIDTH=224, BATCH_SIZE=64, to_binary=False)
 
 if __name__== "__main__":
     
-    prepare_sets()
+    #prepare_sets()
     
     inception, vgg, resnet = prepare_models()
     
-    #inception = compile_and_train(inception, 'inception', WIDTH=299, HEIGHT=299)
+    inception = compile_and_train(inception, 'inception', WIDTH=299, HEIGHT=299)
     vgg = compile_and_train(vgg, 'vgg')
     resnet = compile_and_train(resnet, 'resnet')
    
-    """
     print('Inception 2 classes')
-    inception = load_model('models/tl/2_classes/inception.model')
+    #inception = load_model('models/tl/2_classes/inception.model')
     print(evaluate_model(inception, HEIGHT=299, WIDTH=299))
     
     print('Inception 2 classes')
-    vgg = load_model('models/tl/2_classes/vgg.model')
+    #vgg = load_model('models/tl/2_classes/vgg.model')
     print(evaluate_model(vgg))
     
     print('ResNet 2 classes')
-    resnet = load_model('models/tl/2_classes/resnet.model')
+    #resnet = load_model('models/tl/2_classes/resnet.model')
     print(evaluate_model(resnet))
     """
 
@@ -346,10 +322,13 @@ if __name__== "__main__":
     print('ResNet 3 classes')
     #resnet = load_model('models/tl/3_classes/resnet.model')
     print(evaluate_model(resnet, to_binary=True))
+    """
 
-    #models = [vgg, resnet]
+    print('Ensemble 2 classes')
+    ensemble = ensemble([vgg, resnet])
+    print(evaluate_model(ensemble))
 
     # remove test and train paths
-    shutil.rmtree('train') 
-    shutil.rmtree('cross_val') 
-    shutil.rmtree('test') 
+    #shutil.rmtree('train') 
+    #shutil.rmtree('cross_val') 
+    #shutil.rmtree('test') 
