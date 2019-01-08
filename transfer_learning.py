@@ -35,7 +35,6 @@ def f1_metric(y_true, y_pred):
     recall = recall_metric(y_true, y_pred)
     return 2*((precision*recall)/(precision+recall+K.epsilon()))
 
-
 def save_plot(history, model_name):
     acc = history.history['acc']
     val_acc = history.history['val_acc']
@@ -44,15 +43,17 @@ def save_plot(history, model_name):
     epochs = range(len(acc))
 
     plt.figure()
-    plt.plot(epochs, acc)
-    plt.plot(epochs, val_acc)
+    plt.plot(epochs, acc, label="Training accuracy")
+    plt.plot(epochs, val_acc, label="Validation accuracy")
+    plt.legend(loc='best')
     plt.title('Training and validation accuracy')
     plt.savefig(model_name + '_acc.png')
     plt.close()
-    
+  
     plt.figure()
-    plt.plot(epochs, loss)
-    plt.plot(epochs, val_loss)
+    plt.plot(epochs, loss, label="Training loss")
+    plt.plot(epochs, val_loss, label="Validation loss")
+    plt.legend(loc='best')
     plt.title('Training and validation loss')
     plt.savefig(model_name + '_loss.png')
     plt.close()
@@ -64,9 +65,6 @@ def create_set_folder(set_dir, nevus, melanoma, seborrheic):
     os.mkdir(set_dir + '/nevus')
     for f in nevus:
         shutil.copy(f, set_dir + '/nevus')
-    
-    #for f in seborrheic:
-    #    shutil.copy(f, set_dir + '/nevus_seborr')
     
     os.mkdir(set_dir + '/melanoma')
     for f in melanoma:
@@ -84,7 +82,7 @@ def equalize_set_lengths(set1, set2, set3):
     return set1[:min_length], set2[:min_length], set3[:min_length]
 
 
-def prepare_sets():
+def prepare_sets(equalize=False):
     nevus = glob('dataset/nevus/*.jpg')
     melanoma = glob('dataset/melanoma/*.jpg')
     seborrheic = glob('dataset/seborrheic/*.jpg')
@@ -99,15 +97,14 @@ def prepare_sets():
     melanoma_test, melanoma_cross_val = train_test_split(melanoma_test, test_size=0.50)
     seborrheic_test, seborrheic_cross_val = train_test_split(seborrheic_test, test_size=0.50)
     
-    """ 
-    # Equalize set lengths
-    nevus_train, melanoma_train, seborrheic_train = equalize_set_lengths(nevus_train, 
-            melanoma_train, seborrheic_train)
-    nevus_cross_val, melanoma_cross_val, seborrheic_cross_val = equalize_set_lengths(nevus_cross_val, 
-            melanoma_cross_val, seborrheic_cross_val)
-    nevus_test, melanoma_test, seborrheic_test = equalize_set_lengths(nevus_test, 
-            melanoma_test, seborrheic_test)
-    """
+    if equalize:
+        # Equalize set lengths
+        nevus_train, melanoma_train, seborrheic_train = equalize_set_lengths(nevus_train, 
+                melanoma_train, seborrheic_train)
+        nevus_cross_val, melanoma_cross_val, seborrheic_cross_val = equalize_set_lengths(nevus_cross_val, 
+                melanoma_cross_val, seborrheic_cross_val)
+        nevus_test, melanoma_test, seborrheic_test = equalize_set_lengths(nevus_test, 
+                melanoma_test, seborrheic_test)
 
     # Create folders with each set
     create_set_folder('train', nevus_train, melanoma_train, seborrheic_train)
@@ -117,7 +114,6 @@ def prepare_sets():
 
 def plot_data():
     # Plot some samples of each class
-
     n = np.random.choice(nevus_train, 5)
     m = np.random.choice(melanoma_train, 5)
     s = np.random.choice(seborrheic_train, 5)
@@ -193,7 +189,7 @@ def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=64):
     )
 
     validation_datagen = ImageDataGenerator(
-            preprocessing_function=preprocess_input
+        preprocessing_function=preprocess_input
     )
 
     train_generator = train_datagen.flow_from_directory(
