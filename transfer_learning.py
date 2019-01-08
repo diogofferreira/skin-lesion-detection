@@ -50,7 +50,7 @@ def save_plot(history, model_name):
     plt.savefig(model_name + '_acc.png')
     plt.close()
     
-    plf.figure()
+    plt.figure()
     plt.plot(epochs, loss)
     plt.plot(epochs, val_loss)
     plt.title('Training and validation loss')
@@ -136,10 +136,7 @@ def plot_data():
     plt.show()
 
 
-def prepare_models(CLASSES=2):
-
-    model_input = Input(shape=(224, 224, 3))
-
+def prepare_models(model_input, CLASSES=2):
     # Setup model
     inception_base_model = InceptionV3(weights='imagenet', include_top=False, input_tensor=model_input)
     vgg_base_model = VGG19(weights='imagenet', include_top=False, input_tensor=model_input)
@@ -170,9 +167,9 @@ def prepare_models(CLASSES=2):
     for layer in resnet_base_model.layers:
         layer.trainable = False
     
-    inception_model = Model(inputs=inception_base_model.input, outputs=predictions_inception)
-    vgg_model = Model(inputs=vgg_base_model.input, outputs=predictions_vgg)
-    resnet_model = Model(inputs=resnet_base_model.input, outputs=predictions_resnet)
+    inception_model = Model(inputs=model_input, outputs=predictions_inception)
+    vgg_model = Model(inputs=model_input, outputs=predictions_vgg)
+    resnet_model = Model(inputs=model_input, outputs=predictions_resnet)
        
     return inception_model, vgg_model, resnet_model
 
@@ -237,11 +234,11 @@ def compile_and_train(model, model_name, WIDTH=224, HEIGHT=224, BATCH_SIZE=64):
     return model
 
 
-def ensemble(models):
+def ensemble(models, model_input):
     outputs = [model.outputs[0] for model in models]
-    output = Average()(outputs)
+    model_output = Average()(outputs)
     
-    model = Model(inputs=models[0].input, outputs=output, name='ensemble')
+    model = Model(inputs=model_input, outputs=model_output, name='ensemble')
     
     return model
 
@@ -294,13 +291,13 @@ if __name__== "__main__":
     
     inception, vgg, resnet = prepare_models()
     
-    inception = compile_and_train(inception, 'inception', WIDTH=299, HEIGHT=299)
+    inception = compile_and_train(inception, 'inception')#, WIDTH=299, HEIGHT=299)
     vgg = compile_and_train(vgg, 'vgg')
     resnet = compile_and_train(resnet, 'resnet')
    
     print('Inception 2 classes')
     #inception = load_model('models/tl/2_classes/inception.model')
-    print(evaluate_model(inception, HEIGHT=299, WIDTH=299))
+    print(evaluate_model(inception)) #, HEIGHT=299, WIDTH=299))
     
     print('Inception 2 classes')
     #vgg = load_model('models/tl/2_classes/vgg.model')
@@ -325,7 +322,7 @@ if __name__== "__main__":
     """
 
     print('Ensemble 2 classes')
-    ensemble = ensemble([vgg, resnet])
+    ensemble = ensemble([inception, vgg, resnet])
     print(evaluate_model(ensemble))
 
     # remove test and train paths
