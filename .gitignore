@@ -1,2 +1,6 @@
 dataset/
+dataset.zip
+models/
+testset/
+valset/
 venv/
